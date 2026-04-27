@@ -1,47 +1,37 @@
-# JEPA Tokenizer (Reproducible Baseline)
+# JEPA Tokenizer (Original-Code-Oriented Rebuild)
 
-논문(ArXiv:2512.07168)과 공개 코드(Density-Adaptive-JEPA)를 기준으로,
-**학습/추론이 실제로 가능한 최소 재현 베이스라인**을 제공하는 저장소입니다.
+이 저장소는 `gioannides/Density-Adaptive-JEPA`의 **코드 구조/인터페이스를 최대한 따라가는 방향**으로 재구성한 경량 실행판입니다.
 
-## 포함 내용
-- `ANALYSIS.md`: 논문-코드 정합성 검토 보고서
-- `WORK_PLAN.md`: 작업 계획서 및 진행 상태
-- `src/jepa_tokenizer.py`: Stage1/Stage2 학습 + 추론 CLI
-- `scripts/make_dummy_jsonl.py`: 더미 JSONL 데이터 생성 유틸
+## 반영 우선순위
+1. 논문 텍스트보다 **오리지널 공개 코드 재활용**
+2. 원본의 stage naming/유틸 함수 naming 유지 (`train_jepa`, `train_decoder`, `fsq_pack_indices` 등)
+3. 단일 스크립트형 실행 UX 유지
+
+## 포함 파일
+- `src/jepa_tokenizer.py`: 원본 스크립트 스타일 2-stage + infer CLI
+- `ANALYSIS.md`: 원본 코드 반영 관점의 정합성 검토
+- `scripts/make_dummy_jsonl.py`: 테스트 JSONL 생성
 
 ---
 
-## 1) 환경 준비
+## 1) 설치
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install torch
-# 선택: 실제 오디오 로딩 사용 시
+# 선택(실오디오 로드)
 pip install torchaudio
 ```
 
-## 1.5) 논문 데이터 확보 가이드
-논문(4.1 Dataset) 기준 **LibriLight** 확보/검증 절차는 `DATA_ACQUISITION.md`를 참고하세요.
-
 ## 2) 데이터 준비
-학습 스크립트는 JSONL(`{"path": "/abs/or/rel/path.wav"}`)을 받습니다.
-
-### 더미 데이터(스모크 테스트용)
 ```bash
 python scripts/make_dummy_jsonl.py --out data/train.jsonl --count 32
 ```
 
-### 실제 데이터 예시
-```json
-{"path": "/data/audio/a.wav"}
-{"path": "/data/audio/b.wav"}
-```
-
----
-
-## 3) Stage 1 학습 (JEPA-style masked prediction)
+## 3) Stage 1 (JEPA)
 ```bash
-python src/jepa_tokenizer.py train_stage1 \
+python src/jepa_tokenizer.py \
+  --stage train_jepa \
   --jsonl data/train.jsonl \
   --out_dir outputs \
   --max_steps 20 \
@@ -49,47 +39,35 @@ python src/jepa_tokenizer.py train_stage1 \
   --mask_ratio 0.5 \
   --device cpu
 ```
-산출물:
-- `outputs/stage1.pt`
+산출물: `outputs/stage1_jepa.pt`
 
-## 4) Stage 2 학습 (Frozen encoder + FSQ + decoder)
+## 4) Stage 2 (Decoder)
 ```bash
-python src/jepa_tokenizer.py train_stage2 \
+python src/jepa_tokenizer.py \
+  --stage train_decoder \
   --jsonl data/train.jsonl \
   --out_dir outputs \
-  --stage1_ckpt outputs/stage1.pt \
+  --stage1_ckpt outputs/stage1_jepa.pt \
   --max_steps 20 \
   --batch_size 4 \
   --device cpu
 ```
-산출물:
-- `outputs/stage2.pt`
+산출물: `outputs/stage2_decoder.pt`
 
-## 5) 추론 (토큰화 + 복원)
+## 5) Infer
 ```bash
-python src/jepa_tokenizer.py infer \
+python src/jepa_tokenizer.py \
+  --stage infer \
   --jsonl data/train.jsonl \
-  --ckpt outputs/stage2.pt \
+  --ckpt outputs/stage2_decoder.pt \
   --out_dir outputs/infer \
   --device cpu
 ```
 산출물:
-- `outputs/infer/tokens.pt` (토큰 인덱스)
-- `outputs/infer/recon.pt` (복원 waveform tensor)
+- `outputs/infer/recon.pt`
+- `outputs/infer/indices.pt`
+- `outputs/infer/packed_tokens.pt`
 
----
-
-## 구현 설명 (요약)
-- **DAAM**: Gaussian mixture 기반의 confidence gating으로 latent sequence를 동적으로 강조.
-- **Stage1**: 마스킹된 latent를 predictor로 예측(MSE).
-- **Stage2**: encoder freeze 후 FSQ quantization + decoder 복원(L1).
-- **Inference**: `encode_tokens` + `reconstruct` 결과 저장.
-
-## 한계
-- 본 구현은 재현성/가독성을 위한 baseline이며, 논문 수치(예: 47.5 tokens/sec)의 완전 재현을 목표로 하지는 않습니다.
-- adversarial vocoder 및 분산학습(DeepSpeed) 파트는 경량화 버전으로 대체했습니다.
-
-## 권장 확장
-- 멀티스케일 STFT + GAN loss 추가
-- 분산학습 및 mixed precision 추가
-- 토큰 packing/bitrate 분석 리포트 자동화
+## 비고
+- 원본 저장소는 현재 접근 시 스크립트가 line-wrapped 되지 않은 형태로 배포되어 코드 감사 난이도가 높았습니다.
+- 본 구현은 원본의 명명/흐름을 우선 반영하되, 로컬 단일 GPU/CPU에서도 테스트 가능한 경량화로 조정했습니다.

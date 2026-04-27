@@ -1,35 +1,55 @@
-# 논문/공개코드 구현 검토 보고서
+# Density-Adaptive-JEPA 원본 코드 반영 검토 (2026-04-27)
 
-## 검토 대상
-- 논문: **JEPA as a Neural Tokenizer: Learning Robust Speech Representations with Density Adaptive Attention** (arXiv:2512.07168, 2025-12-08 제출)
-- 코드: `gioannides/Density-Adaptive-JEPA` 공개 저장소
+## 요청 해석
+사용자 요청의 핵심은 **"논문 충실성"보다 "오리지널 코드 재활용"**입니다.
 
-## 핵심 주장 요약
-1. 2-stage 학습 (JEPA pretrain → FSQ + vocoder decoder)
-2. DAAM(밀도 적응 attention) 기반 시계열 선택
-3. 저프레임레이트 토큰화(논문 초록 기준 2.5Hz / 47.5 tokens-sec)
-4. 복원 가능한 neural tokenizer
+## 원본 저장소 확인 결과
+대상: `https://github.com/gioannides/Density-Adaptive-JEPA`
 
-## 공개 코드 정합성 점검 결과
+확인된 파일/구조:
+- `train_fsqvae_jepa.py`
+- `ds_ckpt_to_pt.py`
+- README 상 2-stage pipeline (`train_jepa`, `train_decoder`)와 DeepSpeed 중심 실행 인터페이스
 
-### 일치하는 부분
-- 단일 학습 스크립트 내 stage 분리(`train_jepa`, `train_decoder`) 구조 존재.
-- FSQ 인덱스 패킹/토큰 통계 계산 함수가 포함되어 토큰/sec 측정 로직이 있음.
-- stage2에서 encoder freezing 및 decoder/adversarial 학습 경로가 있음.
-- DeepSpeed 체크포인트를 일반 `.pt`로 합치는 보조 스크립트 제공.
+추가 관찰:
+- 원본의 핵심 유틸/함수명은 다음이 공개적으로 확인됨.
+  - `print_model_stats`
+  - `_fsq_dim_radices`
+  - `fsq_pack_indices`
+  - `fsq_token_stats_from_indices`
+  - `create_jepa_mask`
+- README 설명 기준 핵심 구성은 GAATN(=Gaussian Adaptive Attention), FSQ, Conformer block, HiFi-GAN decoder, 2-stage 학습 흐름.
 
-### 불명확/부족한 부분
-- 저장소 파일 수가 적고(README + 2 scripts) 실험 재현에 필요한 설정 파일(`ds_config.json`)과 데이터 준비 파이프라인이 저장소 내부에 완결되어 있지 않음.
-- 실행 예시에서 파일명 불일치가 관찰됨(README 예시는 `train_jepa_fsqvae_hifigan.py`, 실제 파일은 `train_fsqvae_jepa.py`).
-- 논문의 정량 지표를 재현하기 위한 하이퍼파라미터/데이터셋 상세가 코드만으로 충분히 고정되지 않아, “즉시 재현”보다는 “학습 코드 공개”에 가까운 상태.
-- 웹에서 조회된 raw 스크립트는 단일 라인 형태로 서빙되어 가독성과 코드 감사성이 떨어짐.
+## 기존 구현 대비 문제점
+기존 로컬 구현은 동작은 가능했지만,
+- CLI가 `train_stage1`/`train_stage2` 서브커맨드 기반으로 원본과 인터페이스 괴리,
+- 원본 유틸 함수명/토큰 패킹 유틸 반영 부족,
+- 원본 흐름(`--stage train_jepa/train_decoder`)과 거리가 있었습니다.
 
-## 본 저장소에서의 보강 방향
-- 학습/추론 최소 재현 가능한 **독립 실행형 파이프라인** 제공.
-- DAAM 개념을 반영한 간결한 모듈화 구현 (`DAAM`, `FSQ`, stage1/stage2 trainer).
-- README에 데이터 포맷, 단계별 명령, 실패 대응 팁, 산출물 설명까지 포함.
+## 재구현 반영 사항
+`src/jepa_tokenizer.py`를 원본 지향으로 재정렬했습니다.
+
+1. 인터페이스 정렬
+- 단일 엔트리 + `--stage {train_jepa, train_decoder, infer}`
+
+2. 원본 유틸 함수명 재사용
+- `print_model_stats`
+- `_fsq_dim_radices`
+- `fsq_pack_indices`
+- `fsq_token_stats_from_indices`
+- `create_jepa_mask`
+
+3. 모델 구성 명명/흐름 정렬
+- `GaussianAdaptiveAttention`(GAATN 대응)
+- `TinyConformerBlock` (경량 conformer 대응)
+- `JEPAEncoder`, `JEPAPredictor`, `FSQ`, `SimpleHiFiGenerator`
+- Stage 1: masked JEPA latent prediction
+- Stage 2: encoder freeze + FSQ + decoder + spectral 보조 loss
+
+4. 토큰 통계/패킹 경로 반영
+- decoder 학습 로그에서 tokens/sec 출력
+- infer 시 packed token tensor 저장
 
 ## 결론
-- 공개 코드는 논문의 큰 구조(2-stage + DAAM/FSQ + decoder)를 반영하고 있으나,
-  즉시 재현 가능한 형태로는 문서/구성 요소가 일부 부족하다.
-- 따라서 본 저장소에서는 **재현성 중심의 baseline 구현 + 상세 문서화**를 추가하였다.
+현재 버전은 논문 텍스트 중심 구현에서 벗어나,
+**원본 저장소의 함수명/실행 흐름/토큰 패킹 유틸을 우선 재사용한 구조**로 업데이트되었습니다.
