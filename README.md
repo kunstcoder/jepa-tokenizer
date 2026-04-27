@@ -20,6 +20,9 @@ pip install torch
 pip install torchaudio
 ```
 
+## 1.5) 논문 데이터 확보 가이드
+논문(4.1 Dataset) 기준 **LibriLight** 확보/검증 절차는 `DATA_ACQUISITION.md`를 참고하세요.
+
 ## 2) 데이터 준비
 학습 스크립트는 JSONL(`{"path": "/abs/or/rel/path.wav"}`)을 받습니다.
 
