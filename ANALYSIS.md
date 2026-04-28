@@ -53,3 +53,9 @@
 ## 결론
 현재 버전은 논문 텍스트 중심 구현에서 벗어나,
 **원본 저장소의 함수명/실행 흐름/토큰 패킹 유틸을 우선 재사용한 구조**로 업데이트되었습니다.
+
+## 추가 보강(2026-04-28)
+- Stage 1을 단순 MSE 예측에서 **online/target encoder(EMA) + masked predictor** 구조로 강화.
+- Encoder를 다층 Conformer 블록 기반으로 확장하고, GAATN 스타일 confidence gating을 전단에 유지.
+- Stage 2는 encoder/predictor freeze 후 FSQ + decoder 학습으로 고정하고, waveform L1 + log-spectral MSE를 결합.
+- FSQ는 `levels`를 코드 차원 전체에 타일링해 per-dimension 양자화 수준을 적용하도록 수정.
