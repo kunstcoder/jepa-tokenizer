@@ -41,7 +41,7 @@ python src/jepa_tokenizer.py \
   --mask_ratio 0.5 \
   --device cpu
 ```
-산출물: `outputs/stage1_jepa.pt`
+산출물 예시: `outputs/stage1_jepa_step20.pt` (`save_every_steps`마다 step suffix로 저장)
 
 ## 4) Stage 2 (Decoder)
 ```bash
@@ -49,19 +49,19 @@ python src/jepa_tokenizer.py \
   --stage train_decoder \
   --jsonl data/train.jsonl \
   --out_dir outputs \
-  --stage1_ckpt outputs/stage1_jepa.pt \
+  --stage1_ckpt outputs/stage1_jepa_step20.pt \
   --max_steps 20 \
   --batch_size 4 \
   --device cpu
 ```
-산출물: `outputs/stage2_decoder.pt`
+산출물 예시: `outputs/stage2_decoder_step20.pt` (`save_every_steps`마다 step suffix로 저장)
 
 ## 5) Infer
 ```bash
 python src/jepa_tokenizer.py \
   --stage infer \
   --jsonl data/train.jsonl \
-  --ckpt outputs/stage2_decoder.pt \
+  --ckpt outputs/stage2_decoder_step20.pt \
   --out_dir outputs/infer \
   --device cpu
 ```

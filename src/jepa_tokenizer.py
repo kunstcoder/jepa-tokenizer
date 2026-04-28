@@ -425,6 +425,10 @@ def save_ckpt(path: str, model: nn.Module, step: int, args: argparse.Namespace) 
     )
 
 
+def ckpt_path_with_step(out_dir: str, prefix: str, step: int) -> str:
+    return str(Path(out_dir) / f"{prefix}_step{step}.pt")
+
+
 def load_ckpt(path: str, model: nn.Module) -> int:
     data = torch.load(path, map_location="cpu")
     model.load_state_dict(data["state_dict"], strict=False)
@@ -467,7 +471,7 @@ def train_jepa(args: argparse.Namespace) -> None:
                     f"align={aux['align']:.4f} mask={aux['mask_ratio_real']:.3f} steps/s={step/elapsed:.2f}"
                 )
             if step % args.save_every_steps == 0 or step >= args.max_steps:
-                save_ckpt(str(Path(args.out_dir) / "stage1_jepa.pt"), model, step, args)
+                save_ckpt(ckpt_path_with_step(args.out_dir, "stage1_jepa", step), model, step, args)
             if step >= args.max_steps:
                 break
 
@@ -531,7 +535,7 @@ def train_decoder(args: argparse.Namespace) -> None:
                     f"spec={spectral.item():.4f} tok/s={stats['tokens_per_sec']:.2f} steps/s={step/elapsed:.2f}"
                 )
             if step % args.save_every_steps == 0 or step >= args.max_steps:
-                save_ckpt(str(Path(args.out_dir) / "stage2_decoder.pt"), model, step, args)
+                save_ckpt(ckpt_path_with_step(args.out_dir, "stage2_decoder", step), model, step, args)
             if step >= args.max_steps:
                 break
 
